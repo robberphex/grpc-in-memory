@@ -4,12 +4,10 @@ package main
 import (
 	"context"
 	"log"
-	"net"
 	"os"
 	"time"
 
 	pb "github.com/robberphex/grpc-in-memory/helloworld"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -18,19 +16,8 @@ const (
 )
 
 func main() {
-	pipe := ListenPipe()
-	go initServer(pipe)
-	clientConn, err := grpc.Dial(`pipe`,
-		grpc.WithInsecure(),
-		grpc.WithContextDialer(func(c context.Context, s string) (net.Conn, error) {
-			return pipe.DialContext(c, `pipe`, s)
-		}),
-	)
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer clientConn.Close()
-	c := pb.NewGreeterClient(clientConn)
+	svc := NewServerImpl()
+	c := serverToClient(svc)
 
 	// Contact the server and print out its response.
 	name := defaultName
