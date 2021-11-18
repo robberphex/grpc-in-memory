@@ -3,32 +3,42 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"os"
 	"time"
 
 	pb "github.com/robberphex/grpc-in-memory/helloworld"
-)
-
-const (
-	address     = "localhost:50051"
-	defaultName = "world"
 )
 
 func main() {
 	svc := NewServerImpl()
 	c := serverToClient(svc)
 
-	// Contact the server and print out its response.
-	name := defaultName
-	if len(os.Args) > 1 {
-		name = os.Args[1]
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		r, err := c.SayHello(ctx, &pb.HelloRequest{Name: fmt.Sprintf("world_unary_%d", i)})
+		if err != nil {
+			log.Fatalf("could not greet: %v", err)
+		}
+		log.Printf("Greeting: %s", r.GetMessage())
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
-	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+
+	for i := 0; i < 5; i++ {
+		sClient, err := c.SayHelloStream(ctx)
+		if err != nil {
+			log.Fatalf("could not SayHelloStream: %v", err)
+		}
+		defer sClient.CloseSend()
+		err = sClient.Send(&pb.HelloRequest{Name: fmt.Sprintf("world_stream_%d", i)})
+		if err != nil {
+			log.Fatalf("could not Send: %v", err)
+		}
+		time.Sleep(time.Millisecond * 1000)
+		reply, err := sClient.Recv()
+		if err != nil {
+			log.Fatalf("could not Recv: %v", err)
+		}
+		log.Println(reply.GetMessage())
 	}
-	log.Printf("Greeting: %s", r.GetMessage())
 }

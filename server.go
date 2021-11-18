@@ -5,14 +5,12 @@ import (
 	"context"
 	"log"
 	"net"
+	"sync"
 
+	"github.com/robberphex/grpc-in-memory/helloworld"
 	pb "github.com/robberphex/grpc-in-memory/helloworld"
 
 	"google.golang.org/grpc"
-)
-
-const (
-	port = ":50051"
 )
 
 // server is used to implement helloworld.GreeterServer.
@@ -24,6 +22,28 @@ type server struct {
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
 	log.Printf("Received: %v", in.GetName())
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
+}
+
+// SayHelloStream implements helloworld.GreeterServer
+func (s *server) SayHelloStream(sServer helloworld.Greeter_SayHelloStreamServer) error {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req, err := sServer.Recv()
+		if err != nil {
+			log.Fatalf("error receiving: %v", err)
+		}
+		log.Printf("Received: %v", req.GetName())
+		err = sServer.Send(&pb.HelloReply{Message: "Hello " + req.GetName()})
+		if err != nil {
+			log.Fatalf("error Send: %+v", err)
+		}
+	}()
+	// you cannot leave SayHelloStream with a goroutine that try to Recv and Send
+	wg.Wait()
+	//return errors.New("xxx")
+	return nil
 }
 
 func NewServerImpl() *server {
