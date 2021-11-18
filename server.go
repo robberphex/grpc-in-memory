@@ -24,8 +24,36 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
 }
 
+func (s *server) SayHelloRequestStream(sServer pb.Greeter_SayHelloRequestStreamServer) error {
+	req, err := sServer.Recv()
+	if err != nil {
+		log.Fatalf("error receiving: %v", err)
+	}
+	log.Printf("Received: %v", req.GetName())
+	req, err = sServer.Recv()
+	if err != nil {
+		log.Fatalf("error receiving: %v", err)
+	}
+	log.Printf("Received: %v", req.GetName())
+	sServer.SendAndClose(&pb.HelloReply{Message: "Hello " + req.GetName()})
+	return nil
+}
+
+func (s *server) SayHelloReplyStream(req *pb.HelloRequest, sServer pb.Greeter_SayHelloReplyStreamServer) error {
+	log.Printf("Received: %v", req.GetName())
+	err := sServer.Send(&pb.HelloReply{Message: "Hello " + req.GetName()})
+	if err != nil {
+		log.Fatalf("error Send: %v", err)
+	}
+	err = sServer.Send(&pb.HelloReply{Message: "Hello " + req.GetName() + "_dup"})
+	if err != nil {
+		log.Fatalf("error Send: %v", err)
+	}
+	return nil
+}
+
 // SayHelloStream implements helloworld.GreeterServer
-func (s *server) SayHelloStream(sServer helloworld.Greeter_SayHelloStreamServer) error {
+func (s *server) SayHelloBiStream(sServer helloworld.Greeter_SayHelloBiStreamServer) error {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
